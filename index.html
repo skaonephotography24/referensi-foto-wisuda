@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referensi Foto Wedding di Gereja</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#f2f2f7;
+    color:#000;
+}
+
+/* Header glass ala iOS */
+header{
+    position:sticky;
+    top:0;
+    z-index:100;
+    padding:18px 20px;
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    background:rgba(255,255,255,0.68);
+    border-bottom:1px solid rgba(255,255,255,0.45);
+    box-shadow:0 2px 12px rgba(0,0,0,0.04);
+}
+
+h1{
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+}
+
+/* Gallery */
+.gallery{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:16px;
+    padding:20px;
+}
+
+.photo-card{
+    border-radius:22px;
+    overflow:hidden;
+    background:rgba(255,255,255,0.6);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 8px 24px rgba(0,0,0,0.08);
+    transition:all .35s ease;
+    cursor:pointer;
+}
+
+.photo-card:hover{
+    transform:scale(1.02);
+    box-shadow:0 12px 30px rgba(0,0,0,0.12);
+}
+
+.photo-card img{
+    width:100%;
+    height:320px;
+    object-fit:cover;
+    display:block;
+}
+
+/* Fullscreen viewer */
+.viewer{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.88);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:999;
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+}
+
+.viewer.active{
+    display:flex;
+}
+
+.viewer img{
+    max-width:95%;
+    max-height:90%;
+    border-radius:20px;
+    transition:transform .35s ease, opacity .35s ease;
+    user-select:none;
+    -webkit-user-drag:none;
+}
+
+.close-btn{
+    position:absolute;
+    top:20px;
+    right:20px;
+    color:white;
+    font-size:32px;
+    cursor:pointer;
+    z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Referensi Foto Wedding di Gereja</h1>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="viewer" id="viewer">
+    <div class="close-btn" onclick="closeViewer()">✕</div>
+    <img id="viewerImg" alt="Preview Foto">
+</div>
+
+<script>
+const gallery = document.getElementById("gallery");
+const viewer = document.getElementById("viewer");
+const viewerImg = document.getElementById("viewerImg");
+
+let images = [];
+let currentIndex = 0;
+let startX = 0;
+let isAnimating = false;
+
+/* Load images from JSON */
+fetch("images/images.json")
+.then(res => res.json())
+.then(files => {
+    images = files;
+
+    if(files.length === 0){
+        gallery.innerHTML = "<p>Belum ada foto.</p>";
+        return;
+    }
+
+    files.forEach((file, index) => {
+        const card = document.createElement("div");
+        card.className = "photo-card";
+
+        const img = document.createElement("img");
+        img.src = `images/${file}`;
+        img.alt = `Foto ${index + 1}`;
+        img.loading = "lazy";
+
+        card.onclick = () => openViewer(index);
+
+        card.appendChild(img);
+        gallery.appendChild(card);
+    });
+})
+.catch(err => {
+    gallery.innerHTML = "<p>Gagal memuat foto.</p>";
+    console.error(err);
+});
+
+function openViewer(index){
+    currentIndex = index;
+    viewerImg.src = `images/${images[index]}`;
+    viewer.classList.add("active");
+}
+
+function closeViewer(){
+    viewer.classList.remove("active");
+}
+
+function animateSlide(direction){
+    if(isAnimating) return;
+    isAnimating = true;
+
+    viewerImg.style.opacity = "0";
+    viewerImg.style.transform =
+        direction === "next"
+        ? "translateX(-40px)"
+        : "translateX(40px)";
+
+    setTimeout(() => {
+        viewerImg.src = `images/${images[currentIndex]}`;
+
+        viewerImg.style.transform =
+            direction === "next"
+            ? "translateX(40px)"
+            : "translateX(-40px)";
+
+        requestAnimationFrame(() => {
+            viewerImg.style.opacity = "1";
+            viewerImg.style.transform = "translateX(0)";
+        });
+
+        setTimeout(() => {
+            isAnimating = false;
+        }, 350);
+    }, 180);
+}
+
+function showNext(){
+    currentIndex = (currentIndex + 1) % images.length;
+    animateSlide("next");
+}
+
+function showPrev(){
+    currentIndex = (currentIndex - 1 + images.length) % images.length;
+    animateSlide("prev");
+}
+
+/* Touch swipe */
+viewer.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+});
+
+viewer.addEventListener("touchend", e => {
+    const endX = e.changedTouches[0].clientX;
+    const diff = startX - endX;
+
+    if(Math.abs(diff) < 40) return;
+
+    if(diff > 0){
+        showNext();
+    } else {
+        showPrev();
+    }
+});
+
+/* Mouse swipe desktop */
+viewer.addEventListener("mousedown", e => {
+    startX = e.clientX;
+});
+
+viewer.addEventListener("mouseup", e => {
+    const diff = startX - e.clientX;
+
+    if(Math.abs(diff) < 40) return;
+
+    if(diff > 0){
+        showNext();
+    } else {
+        showPrev();
+    }
+});
+
+/* Keyboard navigation */
+document.addEventListener("keydown", e => {
+    if(!viewer.classList.contains("active")) return;
+
+    if(e.key === "ArrowRight") showNext();
+    if(e.key === "ArrowLeft") showPrev();
+    if(e.key === "Escape") closeViewer();
+});
+
+/* Click outside image to close */
+viewer.addEventListener("click", e => {
+    if(e.target === viewer){
+        closeViewer();
+    }
+});
+</script>
+
+</body>
+</html>
