@@ -6,38 +6,38 @@
 <title>Referensi Foto Wisuda</title>
 
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
+*{margin:0;padding:0;box-sizing:border-box;}
 
 body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background:#f2f2f7;
-    color:#000;
 }
 
-/* Header glass ala iOS */
+/* HEADER */
 header{
     position:sticky;
     top:0;
     z-index:100;
+    display:flex;
+    align-items:center;
+    gap:12px;
     padding:18px 20px;
     backdrop-filter:blur(20px);
-    -webkit-backdrop-filter:blur(20px);
-    background:rgba(255,255,255,0.68);
-    border-bottom:1px solid rgba(255,255,255,0.45);
-    box-shadow:0 2px 12px rgba(0,0,0,0.04);
+    background:rgba(255,255,255,0.7);
+    box-shadow:0 2px 12px rgba(0,0,0,0.05);
+}
+
+header img{
+    width:36px;
+    height:36px;
 }
 
 h1{
-    font-size:30px;
+    font-size:22px;
     font-weight:700;
-    letter-spacing:-0.5px;
 }
 
-/* Gallery */
+/* GALLERY */
 .gallery{
     display:grid;
     grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
@@ -46,19 +46,15 @@ h1{
 }
 
 .photo-card{
-    border-radius:22px;
+    position:relative;
+    border-radius:20px;
     overflow:hidden;
-    background:rgba(255,255,255,0.6);
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    box-shadow:0 8px 24px rgba(0,0,0,0.08);
-    transition:all .35s ease;
     cursor:pointer;
+    transition:.35s;
 }
 
 .photo-card:hover{
-    transform:scale(1.02);
-    box-shadow:0 12px 30px rgba(0,0,0,0.12);
+    transform:scale(1.04) translateY(-4px);
 }
 
 .photo-card img{
@@ -66,19 +62,37 @@ h1{
     height:320px;
     object-fit:cover;
     display:block;
+    filter:blur(10px);
+    transition:filter .4s;
 }
 
-/* Fullscreen viewer */
+.photo-card img.loaded{
+    filter:blur(0);
+}
+
+/* gradient overlay */
+.photo-card::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(to top, rgba(0,0,0,0.2), transparent);
+    opacity:0;
+    transition:.3s;
+}
+
+.photo-card:hover::after{
+    opacity:1;
+}
+
+/* VIEWER */
 .viewer{
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,0.88);
+    background:rgba(0,0,0,0.9);
     display:none;
     align-items:center;
     justify-content:center;
     z-index:999;
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
 }
 
 .viewer.active{
@@ -88,56 +102,66 @@ h1{
 .viewer img{
     max-width:95%;
     max-height:90%;
-    border-radius:20px;
-    transition:transform .35s ease, opacity .35s ease;
-    user-select:none;
-    -webkit-user-drag:none;
+    border-radius:16px;
+    transition:transform .3s, opacity .3s;
 }
 
+/* CLOSE */
 .close-btn{
     position:absolute;
     top:20px;
     right:20px;
     color:white;
-    font-size:32px;
+    font-size:28px;
     cursor:pointer;
-    z-index:1000;
+}
+
+/* COUNTER */
+.counter{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    color:white;
+    font-size:14px;
+    background:rgba(0,0,0,0.4);
+    padding:6px 12px;
+    border-radius:20px;
 }
 </style>
 </head>
 <body>
 
 <header>
-    <h1>Referensi Foto Wisuda</h1>
+    <img src="logo.png" alt="logo">
+    <h1>Katalog Undangan Digital</h1>
 </header>
 
 <div class="gallery" id="gallery"></div>
 
 <div class="viewer" id="viewer">
     <div class="close-btn" onclick="closeViewer()">✕</div>
-    <img id="viewerImg" alt="Preview Foto">
+    <div class="counter" id="counter"></div>
+    <img id="viewerImg">
 </div>
 
 <script>
 const gallery = document.getElementById("gallery");
 const viewer = document.getElementById("viewer");
 const viewerImg = document.getElementById("viewerImg");
+const counter = document.getElementById("counter");
 
 let images = [];
 let currentIndex = 0;
 let startX = 0;
-let isAnimating = false;
+let startY = 0;
+let scale = 1;
 
-/* Load images from JSON */
+/* LOAD JSON */
 fetch("images/images.json")
 .then(res => res.json())
 .then(files => {
     images = files;
-
-    if(files.length === 0){
-        gallery.innerHTML = "<p>Belum ada foto.</p>";
-        return;
-    }
 
     files.forEach((file, index) => {
         const card = document.createElement("div");
@@ -145,23 +169,22 @@ fetch("images/images.json")
 
         const img = document.createElement("img");
         img.src = `images/${file}`;
-        img.alt = `Foto ${index + 1}`;
         img.loading = "lazy";
+
+        img.onload = () => img.classList.add("loaded");
 
         card.onclick = () => openViewer(index);
 
         card.appendChild(img);
         gallery.appendChild(card);
     });
-})
-.catch(err => {
-    gallery.innerHTML = "<p>Gagal memuat foto.</p>";
-    console.error(err);
 });
 
+/* VIEWER */
 function openViewer(index){
     currentIndex = index;
-    viewerImg.src = `images/${images[index]}`;
+    scale = 1;
+    updateImage();
     viewer.classList.add("active");
 }
 
@@ -169,81 +192,68 @@ function closeViewer(){
     viewer.classList.remove("active");
 }
 
-function animateSlide(direction){
-    if(isAnimating) return;
-    isAnimating = true;
+function updateImage(){
+    viewerImg.src = `images/${images[currentIndex]}`;
+    viewerImg.style.transform = `scale(${scale})`;
+    counter.innerText = `${currentIndex+1} / ${images.length}`;
 
-    viewerImg.style.opacity = "0";
-    viewerImg.style.transform =
-        direction === "next"
-        ? "translateX(-40px)"
-        : "translateX(40px)";
-
-    setTimeout(() => {
-        viewerImg.src = `images/${images[currentIndex]}`;
-
-        viewerImg.style.transform =
-            direction === "next"
-            ? "translateX(40px)"
-            : "translateX(-40px)";
-
-        requestAnimationFrame(() => {
-            viewerImg.style.opacity = "1";
-            viewerImg.style.transform = "translateX(0)";
-        });
-
-        setTimeout(() => {
-            isAnimating = false;
-        }, 350);
-    }, 180);
+    preload((currentIndex+1)%images.length);
 }
 
+/* PRELOAD */
+function preload(index){
+    let img = new Image();
+    img.src = `images/${images[index]}`;
+}
+
+/* NAVIGATION */
 function showNext(){
     currentIndex = (currentIndex + 1) % images.length;
-    animateSlide("next");
+    updateImage();
 }
 
 function showPrev(){
     currentIndex = (currentIndex - 1 + images.length) % images.length;
-    animateSlide("prev");
+    updateImage();
 }
 
-/* Touch swipe */
+/* SWIPE */
 viewer.addEventListener("touchstart", e => {
     startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
 });
 
 viewer.addEventListener("touchend", e => {
-    const endX = e.changedTouches[0].clientX;
-    const diff = startX - endX;
+    let endX = e.changedTouches[0].clientX;
+    let endY = e.changedTouches[0].clientY;
 
-    if(Math.abs(diff) < 40) return;
+    let diffX = startX - endX;
+    let diffY = endY - startY;
 
-    if(diff > 0){
-        showNext();
-    } else {
-        showPrev();
+    if(Math.abs(diffX) > 40){
+        diffX > 0 ? showNext() : showPrev();
+    }
+
+    if(diffY > 120){
+        closeViewer();
     }
 });
 
-/* Mouse swipe desktop */
-viewer.addEventListener("mousedown", e => {
-    startX = e.clientX;
+/* ZOOM */
+viewerImg.addEventListener("wheel", e => {
+    e.preventDefault();
+    scale += e.deltaY * -0.001;
+    scale = Math.min(Math.max(1, scale), 3);
+    viewerImg.style.transform = `scale(${scale})`;
 });
 
-viewer.addEventListener("mouseup", e => {
-    const diff = startX - e.clientX;
-
-    if(Math.abs(diff) < 40) return;
-
-    if(diff > 0){
-        showNext();
-    } else {
-        showPrev();
-    }
+/* DOUBLE CLICK */
+viewerImg.addEventListener("dblclick", () => {
+    scale = scale === 1 ? 2 : 1;
+    viewerImg.style.transform = `scale(${scale})`;
 });
 
-/* Keyboard navigation */
+/* KEYBOARD */
 document.addEventListener("keydown", e => {
     if(!viewer.classList.contains("active")) return;
 
@@ -252,7 +262,7 @@ document.addEventListener("keydown", e => {
     if(e.key === "Escape") closeViewer();
 });
 
-/* Click outside image to close */
+/* CLICK OUTSIDE */
 viewer.addEventListener("click", e => {
     if(e.target === viewer){
         closeViewer();
